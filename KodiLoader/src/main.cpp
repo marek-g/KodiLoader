@@ -14,8 +14,12 @@
 
 
 
-WCHAR *pszExe = L"UHDPlayer.exe";
-WCHAR *pszDllPath = L"HDMLClonerLoaderData.dll";
+WCHAR *pszExe = L"kodi.exe";
+#ifdef DETOURS_64BIT
+WCHAR *pszDllPath = L"KodiLoaderData64.dll";
+#else
+WCHAR* pszDllPath = L"KodiLoaderData32.dll";
+#endif
 
 
 
@@ -452,7 +456,7 @@ int CDECL main(int argc, wchar_t **argv)
     ExportContext ec;
     ec.fHasOrdinal1 = FALSE;
     ec.nExports = 0;
-    DetourEnumerateExports(hDll, &ec, ExportCallback);
+    DetourEnumerateExports(hDll, &ec, (PF_DETOUR_ENUMERATE_EXPORT_CALLBACK)ExportCallback);
     FreeLibrary(hDll);
 
     if (!ec.fHasOrdinal1) {
@@ -483,7 +487,7 @@ int CDECL main(int argc, wchar_t **argv)
 #else
     wcscpy(szExe, pszExe);
 #endif
-    for (; arg < argc; arg++) {
+/*    for (; arg < argc; arg++) {
         if (wcschr(argv[arg], L' ') != NULL || wcschr(argv[arg], L'\t') != NULL) {
 #ifdef _CRT_INSECURE_DEPRECATE
             wcscat_s(szCommand, 2048, L"\"");
@@ -510,7 +514,23 @@ int CDECL main(int argc, wchar_t **argv)
             strcat(szCommand, " ");
 #endif
         }
-    }
+    }*/
+
+
+    // run portable version of kodi
+#ifdef _CRT_INSECURE_DEPRECATE
+    wcscat_s(szCommand, 2048, L"\"");
+    wcscat_s(szCommand, 2048, pszExe);
+    wcscat_s(szCommand, 2048, L"\" ");
+    wcscat_s(szCommand, 2048, L"-p");
+#else
+    strcat(szCommand, "\"");
+    strcat(szCommand, pszExe);
+    strcat(szCommand, "\" ");
+    strcat(szCommand, "-p");
+#endif
+
+
     //printf("withdll.exe: Starting: `%s'\n", szCommand);
     //printf("withdll.exe:   with `%s'\n", szDllPath);
     //fflush(stdout);

@@ -9,17 +9,96 @@ static void Init()
 }
 
 
+static LRESULT(CALLBACK* Kodi_MainWndProc)(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) = 0;
+
+
+LRESULT CALLBACK Marek_MainWndProc(
+	HWND hwnd,        // handle to window
+	UINT uMsg,        // message identifier
+	WPARAM wParam,    // first message parameter
+	LPARAM lParam)    // second message parameter
+{
+	if (uMsg == WM_CREATE)
+	{
+		//make_top_most(self);
+		MessageBox(NULL, L"Create", L"Kodi", MB_OK);
+		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+	}
+
+	if (uMsg == WM_LBUTTONUP)
+	{
+		MessageBox(NULL, L"LButtonUp", L"Kodi", MB_OK);
+		return 0;
+	}
+
+
+	return Kodi_MainWndProc(hwnd, uMsg, wParam, lParam);
+}
+
+
+
+
+
+static ATOM(WINAPI* Marek_RegisterClassExW)(const WNDCLASSEXW *wcx) = RegisterClassExW;
+
+ATOM WINAPI Marek__RegisterClassExW(WNDCLASSEXW* wcx)
+{
+	wprintf(wcx->lpszClassName);
+
+	//if (wcscmp(wcx->lpszClassName, L"BlankWindowClass") == 0) {
+	if (wcscmp(wcx->lpszClassName, L"Kodi") == 0) {
+		// 0x77e779a0
+		wchar_t buf[1024];
+		wsprintf(buf, L"%s: %x", wcx->lpszClassName, wcx->lpfnWndProc);
+		Kodi_MainWndProc = wcx->lpfnWndProc;
+
+		wcx->lpfnWndProc = Marek_MainWndProc;
+		
+		MessageBox(NULL, buf, L"Kodi", MB_OK);
+	}
+
+	return Marek_RegisterClassExW(wcx);
+}
+
+
+
+
+
+// Target pointer for the uninstrumented Sleep API.
+//
+static VOID(WINAPI* TrueSleep)(DWORD dwMilliseconds) = Sleep;
+
+// Detour function that replaces the Sleep API.
+//
+VOID WINAPI TimedSleep(DWORD dwMilliseconds)
+{
+	MessageBox(NULL, L"Sleep", L"Kodi", MB_OK);
+	TrueSleep(dwMilliseconds);
+}
+
+
+
 // Variables
 
 DWORD *_is_top_most_ptr = (DWORD*)0x52554C;
 DWORD *_free_apect_rate_ptr = (DWORD*)0x525490;
 DWORD *_auto_hide_buttons_ptr = (DWORD*)0x525550;
 
+// RegisterClassExW
+
+//__stdcall RegisterClassExW(const WNDCLASSEXW*);
+
+
+// CreateWindowExW
+
+typedef HWND(__stdcall* create_window_ex_w)(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName, DWORD dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam);
+create_window_ex_w _create_window_ex_w = (create_window_ex_w)0x01E3E698;
+
 
 // WindowProc
 
-typedef int(__fastcall *window_proc)(int self, void *notUsed, unsigned int wParam, unsigned int uMsg, unsigned int lParam);
-window_proc _window_proc = (window_proc)0x43B9C0;
+typedef int(__cdecl *window_proc)(void *notUsed, unsigned int wParam, unsigned int uMsg, unsigned int lParam);
+window_proc _window_proc = (window_proc)0x8FB020;
 
 
 // window_layout
@@ -108,217 +187,30 @@ void toggle_fullscreen(int self)
 	}
 }
 
+//
+// __create_window_ex_w
+//
+
+HWND __stdcall __create_window_ex_w(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName, DWORD dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam)
+{
+	return _create_window_ex_w(dwExStyle, lpClassName, lpWindowName, dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+}
 
 //
 // __window_proc
 //
 
-int __fastcall __window_proc(int self, void *notUsed, unsigned int uMsg, unsigned int wParam, unsigned int lParam)
+int __cdecl __window_proc(void *notUsed, unsigned int uMsg, unsigned int wParam, unsigned int lParam)
 {
-	HWND hWnd = *((HWND *)self + 8);
+	//HWND hWnd = *((HWND *)self + 8);
 
 	if (uMsg == WM_CREATE)
 	{
-		make_top_most(self);
+		MessageBox(NULL, L"WM_CREATE", L"Kodi", MB_OK);
+		//make_top_most(self);
 	}
 
-	if (uMsg == WM_GETMINMAXINFO)
-	{
-		// set window minimum size
-
-		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
-		lpMMI->ptMinTrackSize.x = 160;
-		lpMMI->ptMinTrackSize.y = 90;
-		return 0;
-	}
-
-	if (uMsg == WM_MOUSEWHEEL || uMsg == 11653 /* mouse hook */)
-	{
-		// disable mouse wheel (do not change volume)
-		return 0;
-	}
-
-	if (uMsg == WM_LBUTTONDBLCLK)
-	{
-		// fullscreen
-		toggle_fullscreen(self);
-		return 0;
-	}
-
-	if (uMsg == 9903)
-	{
-		// mute off
-		_isSound = true;
-	}
-
-	if (uMsg == 9904)
-	{
-		// mute on
-		_isSound = false;
-	}
-
-	if (uMsg == WM_NCRBUTTONUP || uMsg == WM_RBUTTONUP)
-	{
-		// create popup menu
-
-		HMENU mainMenu = CreatePopupMenu();
-
-		AppendMenu(mainMenu, 0, 0xA000A, L"Pokaż przyciski");
-		if (_show_buttons)
-		{
-			CheckMenuItem(mainMenu, 0xA000A, MF_CHECKED);
-		}
-		AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-		bool isRecording = *((void**)0x525A1C) && *((DWORD*)*((void**)0x525A1C) + 429);
-		bool isPaused = *(DWORD*)(self + 5636);
-		AppendMenu(mainMenu, 0, 0xA0006, isRecording ? L"Zatrzymaj nagrywanie" : L"Nagrywaj wideo");
-		AppendMenu(mainMenu, isRecording ? 0 : MF_DISABLED, 0xA0007, isPaused ? L"Kontynuuj nagrywanie" : L"Pauza nagrywania");
-		AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-		AppendMenu(mainMenu, 0, 0xA000B, L"Przechwyć obraz");
-		AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-
-		AppendMenu(mainMenu, 0, 0xA000C, _isSound ? L"Wyłącz dźwięk" : L"Włącz dźwięk");
-		AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-
-		//AppendMenu(mainMenu, 0, 0xA0008, L"Udost�pnianie obrazu");
-		//AppendMenu(mainMenu, 0, 0xA0009, L"Konfiguracja...");
-		//AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-
-		HMENU subMenu1 = CreatePopupMenu();
-		AppendMenu(subMenu1, 0, 0xC8, L"16:9");
-		AppendMenu(subMenu1, 0, 0xC9, L"16:10");
-		AppendMenu(subMenu1, 0, 0xCA, L"4:3");
-		AppendMenu(subMenu1, 0, MF_SEPARATOR, 0);
-		AppendMenu(subMenu1, 0, 0x64, L"Zawsze na wierzchu");
-		if (*_is_top_most_ptr)
-		{
-			CheckMenuItem(subMenu1, 0x64, MF_CHECKED);
-		}
-		AppendMenu(subMenu1, 0, 0x65, L"Zachowaj aspekt");
-		if (!*_free_apect_rate_ptr)
-		{
-			CheckMenuItem(subMenu1, 0x65, MF_CHECKED);
-		}
-		//AppendMenu(subMenu1, 0, 0x66, L"Ukrywaj przyciski");
-		//if (*_auto_hide_buttons_ptr)
-		//{
-		//	CheckMenuItem(subMenu1, 0x66, MF_CHECKED);
-		//}
-		AppendMenu(subMenu1, 0, 0xA0001, L"Zminimalizuj");
-		AppendMenu(subMenu1, 0, 0xA0005, L"Pe�ny ekran");
-		AppendMenu(mainMenu, MF_POPUP, (UINT_PTR)subMenu1, L"Okno");
-
-		//AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-		//AppendMenu(mainMenu, 0, 0xA0002, L"Pomoc");
-		//AppendMenu(mainMenu, 0, 0xA0003, L"O programie");
-		AppendMenu(mainMenu, 0, MF_SEPARATOR, 0);
-		AppendMenu(mainMenu, 0, 0xA0004, L"Wyjdź");
-
-		POINT cursorPos;
-		GetCursorPos(&cursorPos);
-		TrackPopupMenu(mainMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hWnd, 0);
-		PostMessageA(hWnd, WM_NULL, 0, 0);
-
-		DestroyMenu(subMenu1);
-		DestroyMenu(mainMenu);
-
-		return 0;
-	}
-
-	if (uMsg == WM_COMMAND)
-	{
-		// handle popup command
-
-		switch (wParam)
-		{
-		case 0xA0001:
-			// minimize window
-			ShowWindow(hWnd, SW_MINIMIZE);
-			return 0;
-
-		case 0xA0002:
-			// help
-			//_cwnd_move_window((self + 1096), 0, 0, 5, 13, 13, 1);
-			//ShowWindow(*((HWND*)(self + 1096 + 8)), SW_HIDE);
-			//SendMessage(*((HWND*)(self + 1096 + 8)), BM_CLICK, 0, 0);
-			return 0;
-
-		case 0xA0003:
-			// about
-			//SendMessage(*((HWND*)(self + 1296 + 8)), BM_CLICK, 0, 0);
-			return 0;
-
-		case 0xA0004:
-			// exit
-			SendMessage(hWnd, WM_CLOSE, 0, 0);
-			SendMessage(hWnd, WM_QUIT, 0, 0);
-			return 0;
-
-		case 0xA0005:
-			// fullscreen
-			toggle_fullscreen(self);
-			return 0;
-
-		case 0xA0006:
-			// record
-			_record(self, 0);
-			return 0;
-
-		case 0xA0007:
-			// record pause
-			_record_pause(self, 0);
-			return 0;
-
-		case 0xA0008:
-			// video broadcast share
-			_video_broadcast_share(self, 0);
-			return 0;
-
-		case 0xA0009:
-			// show configuration
-			_show_config_dialog(self, 0);
-			return 0;
-
-		case 0xA000A:
-			// show / hide buttons
-			_show_buttons = !_show_buttons;
-			{
-				RECT clientRect;
-				GetClientRect(hWnd, &clientRect);
-				SendMessage(hWnd, WM_SIZE, 0, MAKELPARAM(clientRect.right - clientRect.left,
-					clientRect.bottom - clientRect.top));
-			}
-			return 0;
-
-		case 0xA000B:
-			// capture image
-			{
-				SYSTEMTIME st;
-				GetSystemTime(&st);
-
-				char *video_path = (char*)*((char**)0x5254BC);
-				char path[1024];
-				sprintf(path, "%sIMG_%04d%02d%02d_%02d.%02d.%02d.jpg", video_path,
-					st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-
-				char *old = (char*)*(LPCSTR *)(self + 3248);
-				*(char**)(self + 3248) = path;
-				_capture_image(self, 0);
-				*(char**)(self + 3248) = old;
-			}
-			return 0;
-
-		case 0xA000C:
-			// toggle sound
-			SendMessage(hWnd, _isSound ? 9904 : 9903, 0, 0);
-			return 0;
-
-		default:
-		break;
-		}
-	}
-
-	return _window_proc(self, notUsed, uMsg, wParam, lParam);
+	return _window_proc(notUsed, uMsg, wParam, lParam);
 }
 
 
@@ -539,8 +431,10 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
         
 		Init();
 
-		DetourAttach(&(PVOID&)_window_proc, __window_proc);
-		DetourAttach(&(PVOID&)_window_layout, __window_layout);
+		//DetourAttach(&(PVOID&)TrueSleep, TimedSleep);
+		DetourAttach(&(PVOID&)Marek_RegisterClassExW, Marek__RegisterClassExW);
+		//DetourAttach(&(PVOID&)_window_proc, __window_proc);
+		//DetourAttach(&(PVOID&)_window_layout, __window_layout);
        
 		error = DetourTransactionCommit();
 
@@ -555,8 +449,10 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
 
-		DetourDetach(&(PVOID&)_window_proc, __window_proc);
-		DetourDetach(&(PVOID&)_window_layout, __window_layout);
+		//DetourDetach(&(PVOID&)TrueSleep, TimedSleep);
+		DetourDetach(&(PVOID&)Marek_RegisterClassExW, Marek__RegisterClassExW);
+		//DetourDetach(&(PVOID&)_window_proc, __window_proc);
+		//DetourDetach(&(PVOID&)_window_layout, __window_layout);
         
 		error = DetourTransactionCommit();
     }
