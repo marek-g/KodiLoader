@@ -15,11 +15,11 @@ Helper buttons include:
 
 ## Usage
 
-Copy files to the Kodi's folder. Run `KodiLoader32.exe` for 32-bit version of Kodi or `KodiLoader32.exe` for 32-bit version of Kodi.
+Copy files to the Kodi's folder. Run `KodiLoader32.exe` for 32-bit version of Kodi or `KodiLoader64.exe` for 64-bit version of Kodi.
 
 ## How it works
 
-The loader uses `detours` library to inject custom dll to the Kodi's process. It replaces the original `RegisterClassExW` method with a custom one, that overrides original `WndProc` and modifies window / handle custom window events from there.
+The loader uses `detours` library to inject custom dll to the Kodi's process. It replaces the original `RegisterClassExW` method with a custom one that overrides original `WndProc` and modifies window / handle custom window events from there.
 
 ## License
 
