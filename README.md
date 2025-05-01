@@ -9,7 +9,7 @@ This loader makes a few runtime changes to Kodi to make it more user friendly on
 
 Helper buttons include:
 - "M" (mouse) - toggles between original mouse behavior and using mouse to move/resize the window
-- "F" (fullscreen) - toggles between fullscreen and window mode
+- "T" (top most) - toggles between top most and normal window mode
 - "A" (audio) - toggles audio on/off
 - "Q" (quit) - exits the app
 

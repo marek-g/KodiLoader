@@ -11,35 +11,151 @@ static void Init()
 
 bool _mouse_controls_window = true;
 bool _is_sound = true;
-HWND btn_mouse_mode;
-HWND btn_full_screen;
-HWND btn_audio;
-HWND btn_quit;
+bool _is_top_most = true;
+bool _is_full_screen_set = false;
+bool _is_full_screen = false;
+RECT _window_size_before_full_screen;
+HWND btn_mouse_mode = 0;
+HWND btn_top_most = 0;
+HWND btn_audio = 0;
+HWND btn_quit = 0;
 bool buttons_visible = false;
 
-int btn_size = 50;
+int btn_left_top = 10;
+int btn_size = 25;
 
 void ToggleMouseMode(HWND hwnd) {
 	_mouse_controls_window = !_mouse_controls_window;
 	SetFocus(hwnd);
 	SetActiveWindow(hwnd);
-	ShowCursor(_mouse_controls_window);
+	//ShowCursor(_mouse_controls_window);
+}
+
+void UpdateWindowFrame(HWND hwnd) {
+	// remove icon from the task bar
+	//::SetWindowLongPtrW(hwnd, GWL_EXSTYLE, static_cast<LONG>(WS_EX_TOOLWINDOW));
+
+	if (!_is_full_screen_set) {
+		_is_full_screen = (::GetWindowLongPtr(hwnd, GWL_STYLE) & WS_POPUP);
+		if (_is_full_screen) {
+			_window_size_before_full_screen.left = 100;
+			_window_size_before_full_screen.top = 100;
+			_window_size_before_full_screen.right = _window_size_before_full_screen.left + 1280;
+			_window_size_before_full_screen.bottom = _window_size_before_full_screen.top + 720;
+		}
+		_is_full_screen_set = true;
+	}
+
+	// make window borderless
+	::SetWindowLongPtr(hwnd, GWL_STYLE, static_cast<LONG>(WS_VISIBLE | WS_POPUP | WS_CLIPCHILDREN));
+
+	// make window top-most
+	::SetWindowPos(hwnd, _is_top_most ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+}
+
+void ToggleFullScreen(HWND hwnd) {
+	_is_full_screen = !_is_full_screen;
+
+	if (_is_full_screen) {
+		GetWindowRect(hwnd, &_window_size_before_full_screen);
+	}
+
+	SendMessage(hwnd, WM_KEYDOWN, (WPARAM)VK_OEM_5, (LPARAM)0);
+	SendMessage(hwnd, WM_KEYUP, (WPARAM)VK_OEM_5, (LPARAM)0);
+
+	SetTimer(hwnd, 1235, 10, NULL);
+}
+
+void CreateButtons(HWND hwnd) {
+	if (btn_mouse_mode != 0) {
+		DestroyWindow(btn_mouse_mode);
+	}
+
+	btn_mouse_mode = CreateWindow(
+		L"BUTTON",  // Predefined class; Unicode assumed 
+		L"M",      // Button text 
+		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX | BS_PUSHLIKE,  // Styles 
+		btn_left_top,         // x position 
+		btn_left_top,          // y position 
+		btn_size,        // Button width
+		btn_size,        // Button height
+		hwnd,       // Parent window
+		(HMENU)1234,// Id
+		(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
+		NULL);      // Pointer not needed.
+
+	CheckDlgButton(hwnd, 1234, BST_CHECKED);
+
+	if (btn_top_most != 0) {
+		DestroyWindow(btn_top_most);
+	}
+
+	btn_top_most = CreateWindow(
+		L"BUTTON",  // Predefined class; Unicode assumed 
+		L"T",      // Button text 
+		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX | BS_PUSHLIKE,  // Styles 
+		btn_left_top + btn_size,         // x position 
+		btn_left_top,          // y position 
+		btn_size,        // Button width
+		btn_size,        // Button height
+		hwnd,       // Parent window
+		(HMENU)1235,// Id
+		(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
+		NULL);      // Pointer not needed.
+
+	CheckDlgButton(hwnd, 1235, BST_CHECKED);
+
+	if (btn_audio != 0) {
+		DestroyWindow(btn_audio);
+	}
+
+	btn_audio = CreateWindow(
+		L"BUTTON",  // Predefined class; Unicode assumed 
+		L"A",      // Button text 
+		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX | BS_PUSHLIKE,  // Styles 
+		btn_left_top + btn_size * 2,         // x position 
+		btn_left_top,          // y position 
+		btn_size,        // Button width
+		btn_size,        // Button height
+		hwnd,       // Parent window
+		(HMENU)1236,// Id
+		(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
+		NULL);      // Pointer not needed.
+
+	CheckDlgButton(hwnd, 1236, BST_CHECKED);
+
+	if (btn_quit != 0) {
+		DestroyWindow(btn_quit);
+	}
+
+	btn_quit = CreateWindow(
+		L"BUTTON",  // Predefined class; Unicode assumed 
+		L"Q",      // Button text 
+		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
+		btn_left_top + btn_size * 3,         // x position 
+		btn_left_top,          // y position 
+		btn_size,        // Button width
+		btn_size,        // Button height
+		hwnd,       // Parent window
+		(HMENU)NULL,// Id
+		(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
+		NULL);      // Pointer not needed.
 }
 
 void ShowButtons(HWND hwnd) {
 	buttons_visible = true;
-	ShowWindow(btn_mouse_mode, SHOW_OPENWINDOW);
-	ShowWindow(btn_full_screen, SHOW_OPENWINDOW);
-	ShowWindow(btn_audio, SHOW_OPENWINDOW);
-	ShowWindow(btn_quit, SHOW_OPENWINDOW);
+	ShowWindow(btn_mouse_mode, SW_SHOW);
+	ShowWindow(btn_top_most, SW_SHOW);
+	ShowWindow(btn_audio, SW_SHOW);
+	ShowWindow(btn_quit, SW_SHOW);
 }
 
 void HideButtons(HWND hwnd) {
 	buttons_visible = false;
-	ShowWindow(btn_mouse_mode, HIDE_WINDOW);
-	ShowWindow(btn_full_screen, HIDE_WINDOW);
-	ShowWindow(btn_audio, HIDE_WINDOW);
-	ShowWindow(btn_quit, HIDE_WINDOW);
+	ShowWindow(btn_mouse_mode, SW_HIDE);
+	ShowWindow(btn_top_most, SW_HIDE);
+	ShowWindow(btn_audio, SW_HIDE);
+	ShowWindow(btn_quit, SW_HIDE);
 }
 
 void ToggleButtons(HWND hwnd) {
@@ -63,79 +179,31 @@ LRESULT CALLBACK Marek_MainWndProc(
 	LPARAM lParam)    // second message parameter
 {
 	if (uMsg == WM_CREATE) {
-		btn_mouse_mode = CreateWindow(
-			L"BUTTON",  // Predefined class; Unicode assumed 
-			L"M",      // Button text 
-			WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
-			10,         // x position 
-			10,          // y position 
-			btn_size,        // Button width
-			btn_size,        // Button height
-			hwnd,       // Parent window
-			(HMENU)NULL,// Id
-			(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
-			NULL);      // Pointer not needed.
+		Kodi_MainWndProc(hwnd, uMsg, wParam, lParam);
 
-		btn_full_screen = CreateWindow(
-			L"BUTTON",  // Predefined class; Unicode assumed 
-			L"F",      // Button text 
-			WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
-			10 + btn_size,         // x position 
-			10,          // y position 
-			btn_size,        // Button width
-			btn_size,        // Button height
-			hwnd,       // Parent window
-			(HMENU)NULL,// Id
-			(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
-			NULL);      // Pointer not needed.
-
-		btn_audio = CreateWindow(
-			L"BUTTON",  // Predefined class; Unicode assumed 
-			L"A",      // Button text 
-			WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
-			10 + btn_size*2,         // x position 
-			10,          // y position 
-			btn_size,        // Button width
-			btn_size,        // Button height
-			hwnd,       // Parent window
-			(HMENU)NULL,// Id
-			(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
-			NULL);      // Pointer not needed.
-
-		btn_quit = CreateWindow(
-			L"BUTTON",  // Predefined class; Unicode assumed 
-			L"Q",      // Button text 
-			WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
-			10 + btn_size*3,         // x position 
-			10,          // y position 
-			btn_size,        // Button width
-			btn_size,        // Button height
-			hwnd,       // Parent window
-			(HMENU)NULL,// Id
-			(HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
-			NULL);      // Pointer not needed.
+		CreateButtons(hwnd);
 
 		HideButtons(hwnd);
 
-		SetTimer(hwnd, 123, 1000, NULL);
-	}
+		SetTimer(hwnd, 1234, 10, NULL);
 
-	if (uMsg == WM_ACTIVATE)
-	{
-		// remove icon from the task bar
-		::SetWindowLongPtrW(hwnd, GWL_EXSTYLE, static_cast<LONG>(WS_EX_TOOLWINDOW));
-
-		// make window top-most
-		::SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-
-		//return 0;
-	}
-
-	// no borders
-	if (uMsg == WM_NCCALCSIZE || uMsg == WM_NCPAINT)
-	{
 		return 0;
 	}
+
+	/*if (uMsg == WM_ACTIVATE) // || uMsg == WM_SIZE)
+	{
+		Kodi_MainWndProc(hwnd, uMsg, wParam, lParam);
+
+		SetTimer(hwnd, 1234, 10, NULL);
+
+		return 0;
+	}*/
+
+	// no borders
+	/*if (uMsg == WM_NCCALCSIZE || uMsg == WM_NCPAINT)
+	{
+		return 0;
+	}*/
 
 	// move and resize with mouse in the client area
 	if (uMsg == WM_NCHITTEST)
@@ -194,8 +262,7 @@ LRESULT CALLBACK Marek_MainWndProc(
 
 	if (uMsg == WM_NCLBUTTONDBLCLK || uMsg == WM_LBUTTONDBLCLK) {
 		if (_mouse_controls_window) {
-			SendMessage(hwnd, WM_KEYDOWN, (WPARAM)VK_OEM_5, (LPARAM)0);
-			SendMessage(hwnd, WM_KEYUP, (WPARAM)VK_OEM_5, (LPARAM)0);
+			ToggleFullScreen(hwnd);
 			return 0;
 		}
 	}
@@ -212,7 +279,7 @@ LRESULT CALLBACK Marek_MainWndProc(
 		}
 
 		
-		if (xPos >= 10 && yPos >= 10 && yPos < 10 + btn_size && xPos < 10 + btn_size*4) {
+		if (xPos >= btn_left_top && yPos >= btn_left_top && yPos < btn_left_top + btn_size && xPos < btn_left_top + btn_size*4) {
 			ShowButtons(hwnd);
 			//ShowCursor(true);
 		}
@@ -224,6 +291,10 @@ LRESULT CALLBACK Marek_MainWndProc(
 		}
 
 		ShowCursor(true);
+
+		/*if (_mouse_controls_window) {
+			return 0;
+		}*/
 	}
 
 
@@ -231,12 +302,17 @@ LRESULT CALLBACK Marek_MainWndProc(
 	{
 		if (lParam == (int)btn_mouse_mode) {
 			ToggleMouseMode(hwnd);
+			//ShowCursor(_mouse_controls_window);
+			
 			return 0;
 		}
 
-		if (lParam == (int)btn_full_screen) {
-			SendMessage(hwnd, WM_KEYDOWN, (WPARAM)VK_OEM_5, (LPARAM)0);
-			SendMessage(hwnd, WM_KEYUP, (WPARAM)VK_OEM_5, (LPARAM)0);
+		if (lParam == (int)btn_top_most) {
+			_is_top_most = !_is_top_most;
+
+			// make window top-most
+			::SetWindowPos(hwnd, _is_top_most ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+
 			return 0;
 		}
 
@@ -252,6 +328,22 @@ LRESULT CALLBACK Marek_MainWndProc(
 			SendMessage(hwnd, WM_QUIT, 0, 0);
 			return 0;
 		}
+	}
+
+	if (uMsg == WM_TIMER && wParam == 1234) {
+		KillTimer(hwnd, 1234);
+
+		UpdateWindowFrame(hwnd);
+	}
+
+	if (uMsg == WM_TIMER && wParam == 1235) {
+		KillTimer(hwnd, 1235);
+
+		UpdateWindowFrame(hwnd);
+		SetWindowPos(hwnd, NULL, _window_size_before_full_screen.left, _window_size_before_full_screen.top,
+			_window_size_before_full_screen.right - _window_size_before_full_screen.left,
+			_window_size_before_full_screen.bottom - _window_size_before_full_screen.top,
+			0);
 	}
 
 	return Kodi_MainWndProc(hwnd, uMsg, wParam, lParam);
